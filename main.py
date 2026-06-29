@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm 
 from typing import Optional, List 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session 
@@ -7,7 +8,10 @@ from enum import Enum
 
 
 from database import engine, SessionLocal, Base 
-from models import TodoDB
+from models import TodoDB, UserDB
+from auth import (
+    get_db, hash_password, verify_password, create_access_token, get_current_user
+) 
 
 
 #Cria as tabelas no banco, se ainda não existirem. Ele não faz nada se a tabela já existir
@@ -21,6 +25,24 @@ class Priority(str,Enum):
     LOW = "Low Priority"
     MEDIUM = "Medium Priority"
     HIGH = "High Priority"
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str 
+
+
+class UserOut(BaseModel):
+    username: str
+    password: str 
+
+    class COnfig:
+        from_attributes = True 
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str 
 
 
 #Essa classe define os tópicos disponíveis para serem definidos pelo usuário.
@@ -39,13 +61,33 @@ class Todo(BaseModel):
     completed: bool = False
     priority: Priority 
     created_at: date 
-    
+    owner_id: int 
 
     #Essa classe converte o TodoTB para Todo automaticamente.
     class Config:
         from_attributes = True 
 
 
+@app.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+
+
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    existing = db.query(UserDB).filter(UserDB.username == user.username).first()
+    if existing: 
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username já cadastrado"
+        )
+    novo_user = UserDB(
+        username=user.username,
+        hashed_password=hash_password(user.password)
+    )
+    db.add(novo_user)
+    db.commit()
+    db.refresh(novo_user)
+    return novo_user
+
+    
 def get_db():
     """Essa função abre uma nova sessão com o banco. Entrega a sessão para a rota usar e quando termina, fecha a sessão 
     automaticamente, mesmo se der erro."""
