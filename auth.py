@@ -9,12 +9,16 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session 
 
+from database import SessionLocal 
+from models import UserDB 
+
+
 #Neste bloco a senha é buscada para iniciar a sessão, mas se não for encontrada, devolve uma mensagem de erro.
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    raise RunTimeError("SECRET_KEY não encontrada no arquivo .env")
+    raise RuntimeError("SECRET_KEY não encontrada no arquivo .env")
 
 
 #Algoritmo de criptografia usado para gerar assinaturas das chaves/token do JWT.
@@ -27,7 +31,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
 def get_db():
-    """Abre e fecha uma sessão com o banco de dados - É um "canal de comunicação" """
+    """Abre e fecha uma sessão com o banco de dados - É um "canal de comunicação". Entrega a sessão para a rota usar e quando termina, fecha a sessão 
+    automaticamente, mesmo se der erro."""
     db = SessionLocal()
     try:
         yield db
